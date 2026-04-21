@@ -19,12 +19,37 @@
     "productName": "Markview Pulse",
     "mac": {
       "category": "public.app-category.utilities",
-      "target": "dmg",
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "fileAssociations": [
         {
           "ext": "md",
           "name": "Markdown File",
           "role": "Viewer"
+        }
+      ]
+    },
+    "win": {
+      "target": "nsis",
+      "fileAssociations": [
+        {
+          "ext": "md",
+          "name": "Markdown File"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "fileAssociations": [
+        {
+          "ext": "md",
+          "name": "Markdown File"
         }
       ]
     },
