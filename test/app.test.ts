@@ -272,8 +272,8 @@ test("テーブル列幅を3パターンで切り替えられる", async () => {
   // 初期: 均等
   const table1 = await page.$eval("#content table", (t) => t.className);
   expect(table1).toContain("table-auto");
-  const title1 = await page.$eval("#table-layout-toggle", (el) => el.getAttribute("title"));
-  expect(title1).toBe("列幅: 均等");
+  const text1 = await page.textContent("#table-layout-toggle");
+  expect(text1).toBe("100%");
 
   // クリック1: コンパクト
   await page.click("#table-layout-toggle");

@@ -172,6 +172,9 @@ th {
 #table-layout-toggle {
   bottom: 74px;
   right: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
 }
 
 #diff-toggle {

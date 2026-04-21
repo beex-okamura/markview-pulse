@@ -4,6 +4,7 @@ let showDiff = false;
 
 const TABLE_LAYOUTS = ["table-auto", "table-compact", "table-wide"] as const;
 const TABLE_LAYOUT_LABELS = ["均等", "コンパクト", "広め"];
+const TABLE_LAYOUT_DISPLAY = ["100%", "auto", "wide"];
 let tableLayoutIndex = 0;
 
 function render(): void {
@@ -56,14 +57,6 @@ function updateToggleButton(): void {
   }
 }
 
-// テーブルレイアウトボタン
-const ICON_TABLE = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="2" y="3" width="16" height="14" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
-  <line x1="2" y1="7" x2="18" y2="7" stroke="currentColor" stroke-width="1.5"/>
-  <line x1="8" y1="7" x2="8" y2="17" stroke="currentColor" stroke-width="1.5"/>
-  <line x1="13" y1="7" x2="13" y2="17" stroke="currentColor" stroke-width="1.5"/>
-</svg>`;
-
 function updateTableLayoutButton(): void {
   const tbtn = document.getElementById("table-layout-toggle");
   if (!tbtn) return;
@@ -72,7 +65,7 @@ function updateTableLayoutButton(): void {
     tbtn.style.display = "none";
   } else {
     tbtn.style.display = "";
-    tbtn.innerHTML = ICON_TABLE;
+    tbtn.textContent = TABLE_LAYOUT_DISPLAY[tableLayoutIndex];
     tbtn.title = `列幅: ${TABLE_LAYOUT_LABELS[tableLayoutIndex]}`;
   }
 }
