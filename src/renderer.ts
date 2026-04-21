@@ -89,9 +89,8 @@ document.body.appendChild(btn);
 (window as any).api.onLoadHtml((html: string, diffHtml: string) => {
   currentHtml = html;
   currentDiffHtml = diffHtml;
-  if (showDiff && !diffHtml) {
-    showDiff = false;
-  }
+  // 差分がある場合は自動的に差分表示、なければ通常表示
+  showDiff = !!diffHtml;
   render();
 });
 

@@ -210,7 +210,7 @@ test("テーブルが横スクロール可能なラッパーで囲まれる", as
   expect(wrapperOverflow).toBe("auto");
 });
 
-test("差分表示に切り替えられる", async () => {
+test("ファイル更新時に自動で差分表示になる", async () => {
   // 初回はボタン非表示（差分なし）
   const btnDisplay = await page.$eval("#diff-toggle", (el) => {
     return window.getComputedStyle(el).display;
@@ -220,36 +220,31 @@ test("差分表示に切り替えられる", async () => {
   // ファイルを更新して差分を発生させる
   fs.writeFileSync(testMdPath, "# 変更後の見出し\n\n追加された行。\n");
 
+  // 自動的に差分表示になる
   await page.waitForFunction(
-    () => document.querySelector("#content h1")?.textContent === "変更後の見出し",
+    () => document.querySelector(".diff-added") !== null,
     { timeout: 5000 }
   );
 
-  // ボタンが表示される
-  await page.waitForFunction(
-    () => window.getComputedStyle(document.getElementById("diff-toggle")!).display !== "none",
-    { timeout: 5000 }
-  );
+  // ボタンが表示され「通常表示に戻す」になっている
   const btnTitle = await page.$eval("#diff-toggle", (el) => el.getAttribute("title"));
-  expect(btnTitle).toBe("差分を表示");
+  expect(btnTitle).toBe("通常表示に戻す");
 
-  // ボタンをクリックして差分表示に切り替え
-  await page.click("#diff-toggle");
-
-  // 差分要素が表示される
+  // 差分要素が表示されている
   const hasDiffAdded = await page.$(".diff-added");
   const hasDiffRemoved = await page.$(".diff-removed");
   expect(hasDiffAdded).not.toBeNull();
   expect(hasDiffRemoved).not.toBeNull();
 
-  // ボタンのtitleが切り替わる
-  const btnTitleAfter = await page.$eval("#diff-toggle", (el) => el.getAttribute("title"));
-  expect(btnTitleAfter).toBe("通常表示に戻す");
-
-  // もう一度クリックして通常表示に戻る
+  // ボタンをクリックして通常表示に戻る
   await page.click("#diff-toggle");
   const hasDiffAfterToggle = await page.$(".diff-added");
   expect(hasDiffAfterToggle).toBeNull();
+
+  // もう一度クリックで差分表示に戻る
+  await page.click("#diff-toggle");
+  const hasDiffAgain = await page.$(".diff-added");
+  expect(hasDiffAgain).not.toBeNull();
 });
 
 test("コンテンツ幅を2パターンで切り替えられる", async () => {
@@ -307,4 +302,49 @@ test("テーブル更新時に差分表示でMarkdownが崩れない", async () 
     tds.map((td) => td.textContent)
   );
   expect(cells.length).toBeGreaterThan(0);
+});
+
+test("テーブルのセル変更時に差分表示でMarkdownが崩れない", async () => {
+  fs.writeFileSync(
+    testMdPath,
+    "# テスト\n\n| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n"
+  );
+
+  await page.waitForFunction(
+    () => document.querySelector("#content table") !== null,
+    { timeout: 5000 }
+  );
+
+  // セルの値を変更
+  fs.writeFileSync(
+    testMdPath,
+    "# テスト\n\n| A | B |\n|---|---|\n| 1 | 修正 |\n| 3 | 4 |\n"
+  );
+
+  // 変更がレンダリングされるのを待つ
+  await page.waitForFunction(
+    () => {
+      const tds = document.querySelectorAll("#content td");
+      return Array.from(tds).some((td) => td.textContent === "修正");
+    },
+    { timeout: 5000 }
+  );
+
+  await page.click("#diff-toggle");
+
+  // テーブルがtable要素として正しくレンダリングされている
+  const table = await page.$("#content table");
+  expect(table).not.toBeNull();
+
+  // 変更されたセルが含まれている
+  const cells = await page.$$eval("#content td", (tds) =>
+    tds.map((td) => td.textContent)
+  );
+  expect(cells).toContain("修正");
+
+  // ヘッダーも正しい
+  const headers = await page.$$eval("#content th", (ths) =>
+    ths.map((th) => th.textContent)
+  );
+  expect(headers).toEqual(["A", "B"]);
 });
