@@ -1,0 +1,50 @@
+{
+  "name": "markview-pulse",
+  "version": "1.0.0",
+  "description": "Markview Pulse - Markdown file viewer with live reload and diff",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && electron .",
+    "dev": "tsc && electron . test.md",
+    "test": "tsc && npx playwright test",
+    "pack": "tsc && electron-builder --dir",
+    "dist": "tsc && electron-builder"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "build": {
+    "appId": "com.markview-pulse.app",
+    "productName": "Markview Pulse",
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": "dmg",
+      "fileAssociations": [
+        {
+          "ext": "md",
+          "name": "Markdown File",
+          "role": "Viewer"
+        }
+      ]
+    },
+    "files": [
+      "dist/**/*",
+      "src/index.html",
+      "src/style.css"
+    ]
+  },
+  "dependencies": {
+    "diff": "^9.0.0",
+    "marked": "^18.0.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@types/diff": "^8.0.0",
+    "@types/node": "^25.6.0",
+    "electron": "^41.2.1",
+    "electron-builder": "^26.8.1",
+    "playwright": "^1.59.1",
+    "typescript": "^6.0.3"
+  }
+}
