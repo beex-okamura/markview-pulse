@@ -88,34 +88,20 @@ hr {
 
 table {
   border-collapse: collapse;
+  width: 100%;
   margin: 1em 0;
 }
 
-/* テーブルレイアウト: 均等 */
-table.table-auto {
-  width: 100%;
-  table-layout: fixed;
+/* コンテンツ幅: max */
+body.width-max #content {
+  max-width: none;
+  margin: 0;
 }
 
-/* テーブルレイアウト: コンパクト */
-table.table-compact {
-  width: auto;
-}
-
-table.table-compact th,
-table.table-compact td {
-  padding: 4px 8px;
-  white-space: nowrap;
-}
-
-/* テーブルレイアウト: 広め */
-table.table-wide {
-  width: 100%;
-}
-
-table.table-wide th,
-table.table-wide td {
-  padding: 12px 24px;
+/* コンテンツ幅: fit */
+body.width-fit #content {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 th, td {
@@ -169,7 +155,7 @@ th {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 
-#table-layout-toggle {
+#width-toggle {
   bottom: 74px;
   right: 20px;
   font-size: 11px;

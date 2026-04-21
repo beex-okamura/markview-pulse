@@ -252,41 +252,22 @@ test("差分表示に切り替えられる", async () => {
   expect(hasDiffAfterToggle).toBeNull();
 });
 
-test("テーブル列幅を3パターンで切り替えられる", async () => {
-  fs.writeFileSync(
-    testMdPath,
-    "# テーブル\n\n| A | B | C |\n|---|---|---|\n| 1 | 2 | 3 |\n"
-  );
+test("コンテンツ幅を2パターンで切り替えられる", async () => {
+  // 初期: max
+  const text1 = await page.textContent("#width-toggle");
+  expect(text1).toBe("max");
+  const body1 = await page.$eval("body", (b) => b.className);
+  expect(body1).toContain("width-max");
 
-  await page.waitForFunction(
-    () => document.querySelector("#content table") !== null,
-    { timeout: 5000 }
-  );
+  // クリック1: fit
+  await page.click("#width-toggle");
+  const body2 = await page.$eval("body", (b) => b.className);
+  expect(body2).toContain("width-fit");
+  const text2 = await page.textContent("#width-toggle");
+  expect(text2).toBe("fit");
 
-  // テーブルレイアウトボタンが表示される
-  await page.waitForFunction(
-    () => window.getComputedStyle(document.getElementById("table-layout-toggle")!).display !== "none",
-    { timeout: 5000 }
-  );
-
-  // 初期: 均等
-  const table1 = await page.$eval("#content table", (t) => t.className);
-  expect(table1).toContain("table-auto");
-  const text1 = await page.textContent("#table-layout-toggle");
-  expect(text1).toBe("100%");
-
-  // クリック1: コンパクト
-  await page.click("#table-layout-toggle");
-  const table2 = await page.$eval("#content table", (t) => t.className);
-  expect(table2).toContain("table-compact");
-
-  // クリック2: 広め
-  await page.click("#table-layout-toggle");
-  const table3 = await page.$eval("#content table", (t) => t.className);
-  expect(table3).toContain("table-wide");
-
-  // クリック3: 均等に戻る
-  await page.click("#table-layout-toggle");
-  const table4 = await page.$eval("#content table", (t) => t.className);
-  expect(table4).toContain("table-auto");
+  // クリック2: maxに戻る
+  await page.click("#width-toggle");
+  const body3 = await page.$eval("body", (b) => b.className);
+  expect(body3).toContain("width-max");
 });

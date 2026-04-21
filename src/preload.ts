@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 
 contextBridge.exposeInMainWorld("api", {
   onLoadHtml: (callback: (html: string, diffHtml: string) => void) => {
@@ -8,5 +8,8 @@ contextBridge.exposeInMainWorld("api", {
   },
   openFile: (filePath: string) => {
     ipcRenderer.send("open-file", filePath);
+  },
+  getPathForFile: (file: File) => {
+    return webUtils.getPathForFile(file);
   },
 });

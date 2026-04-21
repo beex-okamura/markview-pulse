@@ -2,10 +2,9 @@ let currentHtml = "";
 let currentDiffHtml = "";
 let showDiff = false;
 
-const TABLE_LAYOUTS = ["table-auto", "table-compact", "table-wide"] as const;
-const TABLE_LAYOUT_LABELS = ["均等", "コンパクト", "広め"];
-const TABLE_LAYOUT_DISPLAY = ["100%", "auto", "wide"];
-let tableLayoutIndex = 0;
+const WIDTH_MODES = ["width-max", "width-fit"] as const;
+const WIDTH_DISPLAY = ["max", "fit"];
+let widthIndex = 0;
 
 function render(): void {
   const container = document.getElementById("content");
@@ -15,15 +14,17 @@ function render(): void {
   const html = showDiff && currentDiffHtml ? currentDiffHtml : currentHtml;
   container.innerHTML = html;
 
-  // テーブルを横スクロール可能なラッパーで囲み、レイアウトクラスを適用
+  // テーブルを横スクロール可能なラッパーで囲む
   container.querySelectorAll("table").forEach((table) => {
     const wrapper = document.createElement("div");
     wrapper.className = "table-wrapper";
-    table.classList.add(TABLE_LAYOUTS[tableLayoutIndex]);
     table.parentNode?.insertBefore(wrapper, table);
     wrapper.appendChild(table);
   });
-  updateTableLayoutButton();
+
+  // コンテンツ幅のクラスを適用
+  document.body.className = WIDTH_MODES[widthIndex];
+  updateWidthButton();
 
   document.documentElement.scrollTop = scrollTop;
   updateToggleButton();
@@ -57,28 +58,21 @@ function updateToggleButton(): void {
   }
 }
 
-function updateTableLayoutButton(): void {
-  const tbtn = document.getElementById("table-layout-toggle");
-  if (!tbtn) return;
-  const hasTables = document.querySelectorAll("#content table").length > 0;
-  if (!hasTables) {
-    tbtn.style.display = "none";
-  } else {
-    tbtn.style.display = "";
-    tbtn.textContent = TABLE_LAYOUT_DISPLAY[tableLayoutIndex];
-    tbtn.title = `列幅: ${TABLE_LAYOUT_LABELS[tableLayoutIndex]}`;
-  }
+function updateWidthButton(): void {
+  const wbtn = document.getElementById("width-toggle");
+  if (!wbtn) return;
+  wbtn.textContent = WIDTH_DISPLAY[widthIndex];
+  wbtn.title = `幅: ${WIDTH_DISPLAY[widthIndex]}`;
 }
 
-const tableBtn = document.createElement("button");
-tableBtn.id = "table-layout-toggle";
-tableBtn.className = "hover-btn";
-tableBtn.style.display = "none";
-tableBtn.addEventListener("click", () => {
-  tableLayoutIndex = (tableLayoutIndex + 1) % TABLE_LAYOUTS.length;
+const widthBtn = document.createElement("button");
+widthBtn.id = "width-toggle";
+widthBtn.className = "hover-btn";
+widthBtn.addEventListener("click", () => {
+  widthIndex = (widthIndex + 1) % WIDTH_MODES.length;
   render();
 });
-document.body.appendChild(tableBtn);
+document.body.appendChild(widthBtn);
 
 // 差分トグルボタンの作成
 const btn = document.createElement("button");
@@ -114,8 +108,8 @@ document.addEventListener("drop", (e) => {
   if (files && files.length > 0) {
     const file = files[0];
     if (file.name.endsWith(".md")) {
-      // @ts-ignore
-      (window as any).api.openFile(file.path);
+      const filePath = (window as any).api.getPathForFile(file);
+      (window as any).api.openFile(filePath);
     }
   }
 });
