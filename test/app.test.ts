@@ -15,7 +15,7 @@ test.beforeEach(async () => {
   );
 
   app = await electron.launch({
-    args: [".", testMdPath],
+    args: [".", "--hidden", testMdPath],
     cwd: path.join(__dirname, ".."),
   });
   page = await app.firstWindow();
@@ -270,4 +270,41 @@ test("コンテンツ幅を2パターンで切り替えられる", async () => {
   await page.click("#width-toggle");
   const body3 = await page.$eval("body", (b) => b.className);
   expect(body3).toContain("width-max");
+});
+
+test("テーブル更新時に差分表示でMarkdownが崩れない", async () => {
+  // テーブル付きのMarkdownを書き込み
+  fs.writeFileSync(
+    testMdPath,
+    "# テスト\n\n| A | B |\n|---|---|\n| 1 | 2 |\n"
+  );
+
+  await page.waitForFunction(
+    () => document.querySelector("#content table") !== null,
+    { timeout: 5000 }
+  );
+
+  // テーブルを更新
+  fs.writeFileSync(
+    testMdPath,
+    "# テスト\n\n| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n"
+  );
+
+  await page.waitForFunction(
+    () => document.getElementById("diff-toggle")?.style.display !== "none",
+    { timeout: 5000 }
+  );
+
+  // 差分表示に切り替え
+  await page.click("#diff-toggle");
+
+  // テーブルがtable要素としてレンダリングされている（崩れていない）
+  const table = await page.$("#content table");
+  expect(table).not.toBeNull();
+
+  // テーブル内のセルが存在する
+  const cells = await page.$$eval("#content td", (tds) =>
+    tds.map((td) => td.textContent)
+  );
+  expect(cells.length).toBeGreaterThan(0);
 });

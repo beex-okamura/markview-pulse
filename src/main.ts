@@ -31,17 +31,77 @@ function addRecentFile(filePath: string): void {
 
 function buildDiffHtml(oldContent: string, newContent: string): string {
   const changes = diffLines(oldContent, newContent);
-  let html = "";
+
+  // 変更・追加された行番号を特定（新コンテンツ基準）
+  const addedLines = new Set<number>();
+  const removedParts: string[] = [];
+  let newLineNum = 0;
   for (const part of changes) {
-    const rendered = marked.parse(part.value) as string;
+    const lineCount = part.value.split("\n").length - 1;
     if (part.added) {
-      html += `<div class="diff-added">${rendered}</div>`;
+      for (let i = 0; i < lineCount; i++) {
+        addedLines.add(newLineNum + i);
+      }
+      newLineNum += lineCount;
     } else if (part.removed) {
-      html += `<div class="diff-removed">${rendered}</div>`;
+      removedParts.push(part.value);
+    } else {
+      newLineNum += lineCount;
+    }
+  }
+
+  // 新コンテンツ全体をHTMLに変換
+  const newHtml = marked.parse(newContent) as string;
+
+  // 削除部分のHTMLを先頭に追加
+  let removedHtml = "";
+  if (removedParts.length > 0) {
+    const removedRendered = marked.parse(removedParts.join("")) as string;
+    removedHtml = `<div class="diff-removed">${removedRendered}</div>`;
+  }
+
+  // 変更がある場合、新コンテンツ全体をdiff-addedで囲む
+  // （行単位のマーキングはHTML変換後では困難なため、ブロック単位で表示）
+  if (addedLines.size > 0 || removedParts.length > 0) {
+    // 変更があった場合：削除部分 + 追加マーク付き新コンテンツ
+    let result = removedHtml;
+    if (addedLines.size > 0) {
+      // 新コンテンツをブロック要素ごとに分割してマーキング
+      result += markChangedBlocks(oldContent, newContent);
+    } else {
+      result += newHtml;
+    }
+    return result;
+  }
+
+  return newHtml;
+}
+
+function markChangedBlocks(oldContent: string, newContent: string): string {
+  // 段落（空行区切り）ごとに差分を比較
+  const oldBlocks = oldContent.split(/\n\n+/);
+  const newBlocks = newContent.split(/\n\n+/);
+
+  let html = "";
+  for (let i = 0; i < newBlocks.length; i++) {
+    const block = newBlocks[i].trim();
+    if (!block) continue;
+    const rendered = marked.parse(block + "\n") as string;
+    if (i >= oldBlocks.length || oldBlocks[i].trim() !== block) {
+      html += `<div class="diff-added">${rendered}</div>`;
     } else {
       html += rendered;
     }
   }
+
+  // 削除されたブロック
+  for (let i = newBlocks.length; i < oldBlocks.length; i++) {
+    const block = oldBlocks[i].trim();
+    if (!block) continue;
+    const rendered = marked.parse(block + "\n") as string;
+    html += `<div class="diff-removed">${rendered}</div>`;
+  }
+
   return html;
 }
 
@@ -119,6 +179,7 @@ function buildMenu(): void {
 function getMarkdownPath(): string | null {
   const args = process.argv.slice(app.isPackaged ? 1 : 2);
   for (const arg of args) {
+    if (arg.startsWith("--")) continue;
     const resolved = path.resolve(process.cwd(), arg);
     if (arg.endsWith(".md") && fs.existsSync(resolved)) {
       return resolved;
@@ -213,8 +274,12 @@ function createWindow(): void {
   });
 
   mainWindow.loadFile(path.join(__dirname, "..", "src", "index.html"));
-  mainWindow.maximize();
-  mainWindow.show();
+
+  const isHidden = process.argv.includes("--hidden");
+  if (!isHidden) {
+    mainWindow.maximize();
+    mainWindow.show();
+  }
 
   mainWindow.on("closed", () => {
     mainWindow = null;
