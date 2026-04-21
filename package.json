@@ -19,10 +19,7 @@
     "productName": "Markview Pulse",
     "mac": {
       "category": "public.app-category.utilities",
-      "target": [
-        "dmg",
-        "zip"
-      ],
+      "target": "dmg",
       "fileAssociations": [
         {
           "ext": "md",

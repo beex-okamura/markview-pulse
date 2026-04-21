@@ -58,7 +58,6 @@ jobs:
           name: release-${{ matrix.platform }}
           path: |
             dist/*.dmg
-            dist/*.zip
             dist/*.exe
             dist/*.AppImage
             dist/*.deb
