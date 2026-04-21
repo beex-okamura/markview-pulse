@@ -2,6 +2,16 @@
 
 Markdownファイルをリアルタイムにプレビューするデスクトップアプリです（macOS / Windows / Linux対応）。ファイルの変更を即座に検知して表示を更新し、変更箇所をインライン差分で確認できます。
 
+## ダウンロード
+
+[最新リリース](https://github.com/beex-okamura/markview-pulse/releases/latest)からお使いのOS向けのファイルをダウンロードしてください。
+
+| OS | ファイル |
+|---|---|
+| macOS (Apple Silicon) | `.dmg` |
+| Windows | `.exe` |
+| Linux | `.AppImage` / `.deb` |
+
 ## スクリーンショット
 
 ### ライトモード
