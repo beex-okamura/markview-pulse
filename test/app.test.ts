@@ -251,3 +251,42 @@ test("差分表示に切り替えられる", async () => {
   const hasDiffAfterToggle = await page.$(".diff-added");
   expect(hasDiffAfterToggle).toBeNull();
 });
+
+test("テーブル列幅を3パターンで切り替えられる", async () => {
+  fs.writeFileSync(
+    testMdPath,
+    "# テーブル\n\n| A | B | C |\n|---|---|---|\n| 1 | 2 | 3 |\n"
+  );
+
+  await page.waitForFunction(
+    () => document.querySelector("#content table") !== null,
+    { timeout: 5000 }
+  );
+
+  // テーブルレイアウトボタンが表示される
+  await page.waitForFunction(
+    () => window.getComputedStyle(document.getElementById("table-layout-toggle")!).display !== "none",
+    { timeout: 5000 }
+  );
+
+  // 初期: 均等
+  const table1 = await page.$eval("#content table", (t) => t.className);
+  expect(table1).toContain("table-auto");
+  const title1 = await page.$eval("#table-layout-toggle", (el) => el.getAttribute("title"));
+  expect(title1).toBe("列幅: 均等");
+
+  // クリック1: コンパクト
+  await page.click("#table-layout-toggle");
+  const table2 = await page.$eval("#content table", (t) => t.className);
+  expect(table2).toContain("table-compact");
+
+  // クリック2: 広め
+  await page.click("#table-layout-toggle");
+  const table3 = await page.$eval("#content table", (t) => t.className);
+  expect(table3).toContain("table-wide");
+
+  // クリック3: 均等に戻る
+  await page.click("#table-layout-toggle");
+  const table4 = await page.$eval("#content table", (t) => t.className);
+  expect(table4).toContain("table-auto");
+});

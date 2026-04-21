@@ -2,6 +2,10 @@ let currentHtml = "";
 let currentDiffHtml = "";
 let showDiff = false;
 
+const TABLE_LAYOUTS = ["table-auto", "table-compact", "table-wide"] as const;
+const TABLE_LAYOUT_LABELS = ["均等", "コンパクト", "広め"];
+let tableLayoutIndex = 0;
+
 function render(): void {
   const container = document.getElementById("content");
   if (!container) return;
@@ -10,13 +14,15 @@ function render(): void {
   const html = showDiff && currentDiffHtml ? currentDiffHtml : currentHtml;
   container.innerHTML = html;
 
-  // テーブルを横スクロール可能なラッパーで囲む
+  // テーブルを横スクロール可能なラッパーで囲み、レイアウトクラスを適用
   container.querySelectorAll("table").forEach((table) => {
     const wrapper = document.createElement("div");
     wrapper.className = "table-wrapper";
+    table.classList.add(TABLE_LAYOUTS[tableLayoutIndex]);
     table.parentNode?.insertBefore(wrapper, table);
     wrapper.appendChild(table);
   });
+  updateTableLayoutButton();
 
   document.documentElement.scrollTop = scrollTop;
   updateToggleButton();
@@ -50,9 +56,41 @@ function updateToggleButton(): void {
   }
 }
 
-// トグルボタンの作成
+// テーブルレイアウトボタン
+const ICON_TABLE = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="3" width="16" height="14" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+  <line x1="2" y1="7" x2="18" y2="7" stroke="currentColor" stroke-width="1.5"/>
+  <line x1="8" y1="7" x2="8" y2="17" stroke="currentColor" stroke-width="1.5"/>
+  <line x1="13" y1="7" x2="13" y2="17" stroke="currentColor" stroke-width="1.5"/>
+</svg>`;
+
+function updateTableLayoutButton(): void {
+  const tbtn = document.getElementById("table-layout-toggle");
+  if (!tbtn) return;
+  const hasTables = document.querySelectorAll("#content table").length > 0;
+  if (!hasTables) {
+    tbtn.style.display = "none";
+  } else {
+    tbtn.style.display = "";
+    tbtn.innerHTML = ICON_TABLE;
+    tbtn.title = `列幅: ${TABLE_LAYOUT_LABELS[tableLayoutIndex]}`;
+  }
+}
+
+const tableBtn = document.createElement("button");
+tableBtn.id = "table-layout-toggle";
+tableBtn.className = "hover-btn";
+tableBtn.style.display = "none";
+tableBtn.addEventListener("click", () => {
+  tableLayoutIndex = (tableLayoutIndex + 1) % TABLE_LAYOUTS.length;
+  render();
+});
+document.body.appendChild(tableBtn);
+
+// 差分トグルボタンの作成
 const btn = document.createElement("button");
 btn.id = "diff-toggle";
+btn.className = "hover-btn";
 btn.style.display = "none";
 btn.addEventListener("click", () => {
   showDiff = !showDiff;

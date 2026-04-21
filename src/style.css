@@ -88,8 +88,34 @@ hr {
 
 table {
   border-collapse: collapse;
-  width: 100%;
   margin: 1em 0;
+}
+
+/* テーブルレイアウト: 均等 */
+table.table-auto {
+  width: 100%;
+  table-layout: fixed;
+}
+
+/* テーブルレイアウト: コンパクト */
+table.table-compact {
+  width: auto;
+}
+
+table.table-compact th,
+table.table-compact td {
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+/* テーブルレイアウト: 広め */
+table.table-wide {
+  width: 100%;
+}
+
+table.table-wide th,
+table.table-wide td {
+  padding: 12px 24px;
 }
 
 th, td {
@@ -118,11 +144,9 @@ th {
   opacity: 0.7;
 }
 
-/* トグルボタン */
-#diff-toggle {
+/* ホバーボタン共通 */
+.hover-btn {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
   width: 44px;
   height: 44px;
   padding: 0;
@@ -140,7 +164,17 @@ th {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-#diff-toggle:hover {
+.hover-btn:hover {
   opacity: 1;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+#table-layout-toggle {
+  bottom: 74px;
+  right: 20px;
+}
+
+#diff-toggle {
+  bottom: 20px;
+  right: 20px;
 }

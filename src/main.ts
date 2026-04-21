@@ -204,6 +204,7 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -212,6 +213,8 @@ function createWindow(): void {
   });
 
   mainWindow.loadFile(path.join(__dirname, "..", "src", "index.html"));
+  mainWindow.maximize();
+  mainWindow.show();
 
   mainWindow.on("closed", () => {
     mainWindow = null;
