@@ -12,7 +12,7 @@
     "dist": "tsc && electron-builder"
   },
   "keywords": [],
-  "author": "",
+  "author": "Shuji Okamura <shuji.okamura@beex-inc.com>",
   "license": "ISC",
   "build": {
     "appId": "com.markview-pulse.app",
