@@ -305,6 +305,9 @@ td.diff-changed-cell {
   right: 20px;
   font-size: 11px;
   font-weight: 600;
+  background: #FDD247;
+  color: #012677;
+  border-color: #e6be3a;
   letter-spacing: -0.5px;
 }
 
