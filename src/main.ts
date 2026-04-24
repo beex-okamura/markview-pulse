@@ -273,6 +273,13 @@ function buildMenu(): void {
             }
           },
         },
+        {
+          label: "タブを閉じる",
+          accelerator: "CmdOrCtrl+W",
+          click: () => {
+            if (activeTabId) closeTab(activeTabId);
+          },
+        },
         { type: "separator" },
         { role: "quit", label: "終了" },
       ],
@@ -293,6 +300,35 @@ function buildMenu(): void {
         { role: "zoomIn", label: "拡大" },
         { role: "zoomOut", label: "縮小" },
         { role: "resetZoom", label: "実際のサイズ" },
+        { type: "separator" },
+        {
+          label: "次のタブ",
+          accelerator: "Ctrl+Tab",
+          click: () => {
+            if (tabs.length <= 1) return;
+            const idx = tabs.findIndex((t) => t.id === activeTabId);
+            const next = (idx + 1) % tabs.length;
+            activateTab(tabs[next]);
+          },
+        },
+        {
+          label: "前のタブ",
+          accelerator: "Ctrl+Shift+Tab",
+          click: () => {
+            if (tabs.length <= 1) return;
+            const idx = tabs.findIndex((t) => t.id === activeTabId);
+            const prev = (idx - 1 + tabs.length) % tabs.length;
+            activateTab(tabs[prev]);
+          },
+        },
+        ...Array.from({ length: 9 }, (_, i) => ({
+          label: `タブ ${i + 1}`,
+          accelerator: `CmdOrCtrl+${i + 1}`,
+          click: () => {
+            if (i < tabs.length) activateTab(tabs[i]);
+          },
+          visible: false,
+        })),
       ],
     },
   ];
