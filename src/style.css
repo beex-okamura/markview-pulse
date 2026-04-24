@@ -10,6 +10,10 @@
   --diff-removed-bg: #ffebe9;
   --diff-added-border: #aceebb;
   --diff-removed-border: #ffcecb;
+  --tab-bg: #f0f0f0;
+  --tab-active-bg: #fff;
+  --tab-hover-bg: #e0e0e0;
+  --tab-border: #ccc;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -25,7 +29,113 @@
     --diff-removed-bg: #3a1a1a;
     --diff-added-border: #2d6a4f;
     --diff-removed-border: #6a2d2d;
+    --tab-bg: #2a2a2a;
+    --tab-active-bg: #1e1e1e;
+    --tab-hover-bg: #353535;
+    --tab-border: #444;
   }
+}
+
+/* タブバー */
+#tab-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  display: flex;
+  align-items: end;
+  gap: 2px;
+  padding: 0 8px;
+  background: var(--tab-bg);
+  overflow-x: auto;
+  overflow-y: hidden;
+  z-index: 1001;
+  -webkit-app-region: drag;
+}
+
+#tab-bar:empty,
+#tab-bar[style*="display: none"] {
+  display: none !important;
+}
+
+.tab-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  min-width: 0;
+  max-width: 200px;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0.7;
+  transition: background 0.15s, opacity 0.15s;
+  -webkit-app-region: no-drag;
+  flex-shrink: 0;
+}
+
+.tab-item:hover {
+  background: var(--tab-hover-bg);
+  opacity: 0.9;
+}
+
+.tab-item.tab-active {
+  background: var(--tab-active-bg);
+  opacity: 1;
+}
+
+.tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-close {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.tab-item:hover .tab-close {
+  opacity: 0.6;
+}
+
+.tab-close:hover {
+  opacity: 1 !important;
+  background: rgba(128, 128, 128, 0.3);
+}
+
+.tab-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  margin: auto 4px;
+  border-radius: 6px;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--text);
+  opacity: 0.5;
+  transition: opacity 0.15s, background 0.15s;
+  -webkit-app-region: no-drag;
+}
+
+.tab-add:hover {
+  opacity: 1;
+  background: var(--tab-hover-bg);
 }
 
 body {
@@ -33,8 +143,27 @@ body {
   line-height: 1.6;
   color: var(--text);
   margin: 0;
-  padding: 20px;
+  padding: 56px 20px 40px;
   background: var(--bg);
+}
+
+/* ステータスバー */
+#status-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: #012677;
+  font-size: 11px;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  z-index: 1001;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -176,6 +305,9 @@ td.diff-changed-cell {
   right: 20px;
   font-size: 11px;
   font-weight: 600;
+  background: #FDD247;
+  color: #012677;
+  border-color: #e6be3a;
   letter-spacing: -0.5px;
 }
 

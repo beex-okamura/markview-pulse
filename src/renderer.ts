@@ -4,7 +4,60 @@ let showDiff = false;
 
 const WIDTH_MODES = ["width-max", "width-fit"] as const;
 const WIDTH_DISPLAY = ["max", "fit"];
-let widthIndex = 0;
+let widthIndex = 1;
+
+// タブバー
+const tabBar = document.createElement("div");
+tabBar.id = "tab-bar";
+document.body.prepend(tabBar);
+
+// ステータスバー
+const statusBar = document.createElement("div");
+statusBar.id = "status-bar";
+document.body.appendChild(statusBar);
+
+type TabInfo = { id: string; name: string; path: string };
+
+function renderTabs(tabList: TabInfo[], activeTabId: string | null): void {
+  tabBar.innerHTML = "";
+  for (const tab of tabList) {
+    const tabEl = document.createElement("div");
+    tabEl.className = "tab-item" + (tab.id === activeTabId ? " tab-active" : "");
+    tabEl.addEventListener("click", () => {
+      (window as any).api.switchTab(tab.id);
+    });
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "tab-name";
+    nameSpan.textContent = tab.name;
+
+    const closeBtn = document.createElement("span");
+    closeBtn.className = "tab-close";
+    closeBtn.textContent = "\u00d7";
+    closeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      (window as any).api.closeTab(tab.id);
+    });
+
+    tabEl.appendChild(nameSpan);
+    tabEl.appendChild(closeBtn);
+    tabBar.appendChild(tabEl);
+  }
+
+  // ＋ボタン
+  const addBtn = document.createElement("div");
+  addBtn.className = "tab-add";
+  addBtn.textContent = "+";
+  addBtn.title = "ファイルを開く";
+  addBtn.addEventListener("click", () => {
+    (window as any).api.openFileDialog();
+  });
+  tabBar.appendChild(addBtn);
+
+  // ステータスバーにアクティブタブのパスを表示
+  const activeTab = tabList.find((t) => t.id === activeTabId);
+  statusBar.textContent = activeTab ? activeTab.path : "";
+}
 
 function render(): void {
   const container = document.getElementById("content");
@@ -92,6 +145,10 @@ document.body.appendChild(btn);
   // 差分がある場合は自動的に差分表示、なければ通常表示
   showDiff = !!diffHtml;
   render();
+});
+
+(window as any).api.onUpdateTabs((tabList: TabInfo[], activeTabId: string | null) => {
+  renderTabs(tabList, activeTabId);
 });
 
 // ドラッグ&ドロップ

@@ -248,23 +248,23 @@ test("ファイル更新時に自動で差分表示になる", async () => {
 });
 
 test("コンテンツ幅を2パターンで切り替えられる", async () => {
-  // 初期: max
+  // 初期: fit
   const text1 = await page.textContent("#width-toggle");
-  expect(text1).toBe("max");
+  expect(text1).toBe("fit");
   const body1 = await page.$eval("body", (b) => b.className);
-  expect(body1).toContain("width-max");
+  expect(body1).toContain("width-fit");
 
-  // クリック1: fit
+  // クリック1: max
   await page.click("#width-toggle");
   const body2 = await page.$eval("body", (b) => b.className);
-  expect(body2).toContain("width-fit");
+  expect(body2).toContain("width-max");
   const text2 = await page.textContent("#width-toggle");
-  expect(text2).toBe("fit");
+  expect(text2).toBe("max");
 
-  // クリック2: maxに戻る
+  // クリック2: fitに戻る
   await page.click("#width-toggle");
   const body3 = await page.$eval("body", (b) => b.className);
-  expect(body3).toContain("width-max");
+  expect(body3).toContain("width-fit");
 });
 
 test("テーブル更新時に差分表示でMarkdownが崩れない", async () => {

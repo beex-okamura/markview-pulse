@@ -31,7 +31,16 @@ marked.use({
 
 let mainWindow: BrowserWindow | null = null;
 let watchTimer: NodeJS.Timeout | null = null;
-let previousContent: string = "";
+
+type Tab = {
+  id: string;
+  filePath: string;
+  previousContent: string;
+};
+
+let tabs: Tab[] = [];
+let activeTabId: string | null = null;
+let nextTabId = 1;
 
 const MAX_RECENT_FILES = 10;
 const recentFilesPath = path.join(app.getPath("userData"), "recent-files.json");
@@ -264,6 +273,13 @@ function buildMenu(): void {
             }
           },
         },
+        {
+          label: "タブを閉じる",
+          accelerator: "CmdOrCtrl+W",
+          click: () => {
+            if (activeTabId) closeTab(activeTabId);
+          },
+        },
         { type: "separator" },
         { role: "quit", label: "終了" },
       ],
@@ -284,6 +300,35 @@ function buildMenu(): void {
         { role: "zoomIn", label: "拡大" },
         { role: "zoomOut", label: "縮小" },
         { role: "resetZoom", label: "実際のサイズ" },
+        { type: "separator" },
+        {
+          label: "次のタブ",
+          accelerator: "Ctrl+Tab",
+          click: () => {
+            if (tabs.length <= 1) return;
+            const idx = tabs.findIndex((t) => t.id === activeTabId);
+            const next = (idx + 1) % tabs.length;
+            activateTab(tabs[next]);
+          },
+        },
+        {
+          label: "前のタブ",
+          accelerator: "Ctrl+Shift+Tab",
+          click: () => {
+            if (tabs.length <= 1) return;
+            const idx = tabs.findIndex((t) => t.id === activeTabId);
+            const prev = (idx - 1 + tabs.length) % tabs.length;
+            activateTab(tabs[prev]);
+          },
+        },
+        ...Array.from({ length: 9 }, (_, i) => ({
+          label: `タブ ${i + 1}`,
+          accelerator: `CmdOrCtrl+${i + 1}`,
+          click: () => {
+            if (i < tabs.length) activateTab(tabs[i]);
+          },
+          visible: false,
+        })),
       ],
     },
   ];
@@ -316,47 +361,120 @@ app.on("open-file", (event, filePath) => {
   }
 });
 
-function sendContent(content: string): void {
-  if (!mainWindow) return;
-  const html = marked.parse(content) as string;
-  const diffHtml = previousContent ? buildDiffHtml(previousContent, content) : "";
-  mainWindow.webContents.send("load-html", html, diffHtml);
-  previousContent = content;
+function getActiveTab(): Tab | undefined {
+  return tabs.find((t) => t.id === activeTabId);
 }
 
-function loadMarkdown(filePath: string): void {
+function sendTabsToRenderer(): void {
   if (!mainWindow) return;
+  const tabInfos = tabs.map((t) => ({ id: t.id, name: path.basename(t.filePath), path: t.filePath }));
+  mainWindow.webContents.send("update-tabs", tabInfos, activeTabId);
+}
 
-  // 既存の監視を停止
+function sendContent(tab: Tab, content: string): void {
+  if (!mainWindow) return;
+  const html = marked.parse(content) as string;
+  const diffHtml = tab.previousContent ? buildDiffHtml(tab.previousContent, content) : "";
+  mainWindow.webContents.send("load-html", html, diffHtml);
+  tab.previousContent = content;
+}
+
+function startWatching(tab: Tab): void {
   if (watchTimer) {
     clearInterval(watchTimer);
     watchTimer = null;
   }
 
-  previousContent = "";
-  const content = fs.readFileSync(filePath, "utf-8");
-  sendContent(content);
-  mainWindow.setTitle(path.basename(filePath));
-
-  // 最近開いたファイルに追加
-  addRecentFile(filePath);
-
-  // ファイル変更を監視（更新日時のポーリング）
-  let lastMtime = fs.statSync(filePath).mtimeMs;
+  let lastMtime = fs.statSync(tab.filePath).mtimeMs;
   watchTimer = setInterval(() => {
     try {
-      const stat = fs.statSync(filePath);
+      const stat = fs.statSync(tab.filePath);
       if (stat.mtimeMs !== lastMtime) {
         lastMtime = stat.mtimeMs;
-        const updated = fs.readFileSync(filePath, "utf-8");
-        if (updated !== previousContent) {
-          sendContent(updated);
+        const updated = fs.readFileSync(tab.filePath, "utf-8");
+        if (updated !== tab.previousContent) {
+          sendContent(tab, updated);
         }
       }
     } catch {
       // ファイルが一時的に読めない場合は無視
     }
   }, 1000);
+}
+
+function activateTab(tab: Tab): void {
+  if (!mainWindow) return;
+  activeTabId = tab.id;
+
+  // ファイルを再読み込みして表示
+  tab.previousContent = "";
+  const content = fs.readFileSync(tab.filePath, "utf-8");
+  sendContent(tab, content);
+  mainWindow.setTitle(path.basename(tab.filePath));
+
+  startWatching(tab);
+  sendTabsToRenderer();
+}
+
+function loadMarkdown(filePath: string): void {
+  if (!mainWindow) return;
+
+  // 既にタブに存在する場合はそのタブに切り替え
+  const existing = tabs.find((t) => t.filePath === filePath);
+  if (existing) {
+    activateTab(existing);
+    return;
+  }
+
+  // 新しいタブを追加
+  const tab: Tab = {
+    id: String(nextTabId++),
+    filePath,
+    previousContent: "",
+  };
+  tabs.push(tab);
+
+  // 最近開いたファイルに追加
+  addRecentFile(filePath);
+
+  activateTab(tab);
+}
+
+function switchTab(tabId: string): void {
+  const tab = tabs.find((t) => t.id === tabId);
+  if (tab) {
+    activateTab(tab);
+  }
+}
+
+function closeTab(tabId: string): void {
+  const index = tabs.findIndex((t) => t.id === tabId);
+  if (index === -1) return;
+
+  tabs.splice(index, 1);
+
+  if (tabs.length === 0) {
+    // 全タブ閉じた
+    activeTabId = null;
+    if (watchTimer) {
+      clearInterval(watchTimer);
+      watchTimer = null;
+    }
+    if (mainWindow) {
+      mainWindow.webContents.send("load-html", "<p>Markdownファイルを開いてください。</p>", "");
+      mainWindow.setTitle("Markview Pulse");
+      sendTabsToRenderer();
+    }
+    return;
+  }
+
+  // 閉じたタブがアクティブだった場合、隣のタブをアクティブに
+  if (activeTabId === tabId) {
+    const newIndex = Math.min(index, tabs.length - 1);
+    activateTab(tabs[newIndex]);
+  } else {
+    sendTabsToRenderer();
+  }
 }
 
 function createWindow(): void {
@@ -400,6 +518,25 @@ function createWindow(): void {
 ipcMain.on("open-file", (_event, filePath: string) => {
   if (filePath.endsWith(".md") && fs.existsSync(filePath)) {
     loadMarkdown(filePath);
+  }
+});
+
+ipcMain.on("switch-tab", (_event, tabId: string) => {
+  switchTab(tabId);
+});
+
+ipcMain.on("close-tab", (_event, tabId: string) => {
+  closeTab(tabId);
+});
+
+ipcMain.on("open-file-dialog", async () => {
+  if (!mainWindow) return;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    filters: [{ name: "Markdown", extensions: ["md"] }],
+    properties: ["openFile"],
+  });
+  if (!result.canceled && result.filePaths.length > 0) {
+    loadMarkdown(result.filePaths[0]);
   }
 });
 
