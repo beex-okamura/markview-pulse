@@ -4,6 +4,31 @@ import * as path from "path";
 import { marked } from "marked";
 import { diffArrays } from "diff";
 
+// CJK括弧（「」など）隣接時に**強調**が効かないmarkedの制限を回避
+marked.use({
+  extensions: [{
+    name: "cjkStrong",
+    level: "inline",
+    start(src: string) {
+      return src.match(/\*\*/)?.index;
+    },
+    tokenizer(src: string) {
+      const match = src.match(/^\*\*([^*]+)\*\*/);
+      if (match) {
+        return {
+          type: "cjkStrong",
+          raw: match[0],
+          text: match[1],
+          tokens: this.lexer.inlineTokens(match[1]),
+        };
+      }
+    },
+    renderer(this: any, token: any) {
+      return "<strong>" + this.parser.parseInline(token.tokens) + "</strong>";
+    },
+  }],
+});
+
 let mainWindow: BrowserWindow | null = null;
 let watchTimer: NodeJS.Timeout | null = null;
 let previousContent: string = "";
