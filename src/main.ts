@@ -5,7 +5,7 @@ import { marked } from "marked";
 import { diffArrays } from "diff";
 
 let mainWindow: BrowserWindow | null = null;
-let watcher: fs.FSWatcher | null = null;
+let watchTimer: NodeJS.Timeout | null = null;
 let previousContent: string = "";
 
 const MAX_RECENT_FILES = 10;
@@ -302,10 +302,10 @@ function sendContent(content: string): void {
 function loadMarkdown(filePath: string): void {
   if (!mainWindow) return;
 
-  // 既存のwatcherを閉じる
-  if (watcher) {
-    watcher.close();
-    watcher = null;
+  // 既存の監視を停止
+  if (watchTimer) {
+    clearInterval(watchTimer);
+    watchTimer = null;
   }
 
   previousContent = "";
@@ -316,40 +316,22 @@ function loadMarkdown(filePath: string): void {
   // 最近開いたファイルに追加
   addRecentFile(filePath);
 
-  // ファイル変更を監視
-  // エディタによってはrename(一時ファイル→リネーム)で保存するため両方処理する
-  let debounceTimer: NodeJS.Timeout | null = null;
-  const handleChange = () => {
-    // 短時間に複数イベントが発火するのを防ぐ
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      try {
-        if (!fs.existsSync(filePath)) return;
+  // ファイル変更を監視（更新日時のポーリング）
+  let lastMtime = fs.statSync(filePath).mtimeMs;
+  watchTimer = setInterval(() => {
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.mtimeMs !== lastMtime) {
+        lastMtime = stat.mtimeMs;
         const updated = fs.readFileSync(filePath, "utf-8");
         if (updated !== previousContent) {
           sendContent(updated);
         }
-      } catch {
-        // ファイルが一時的に読めない場合は無視
       }
-    }, 100);
-  };
-
-  watcher = fs.watch(filePath, handleChange);
-
-  // renameでwatcherが壊れる場合があるため、再監視する
-  watcher.on("error", () => {
-    if (watcher) {
-      watcher.close();
-      watcher = null;
+    } catch {
+      // ファイルが一時的に読めない場合は無視
     }
-    // 少し待ってから再監視
-    setTimeout(() => {
-      if (fs.existsSync(filePath)) {
-        watcher = fs.watch(filePath, handleChange);
-      }
-    }, 500);
-  });
+  }, 1000);
 }
 
 function createWindow(): void {
@@ -374,9 +356,9 @@ function createWindow(): void {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
-    if (watcher) {
-      watcher.close();
-      watcher = null;
+    if (watchTimer) {
+      clearInterval(watchTimer);
+      watchTimer = null;
     }
   });
 
