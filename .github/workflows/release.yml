@@ -34,7 +34,6 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        if: matrix.platform == 'mac'
         run: npm test
 
       - name: Build

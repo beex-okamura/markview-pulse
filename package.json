@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "tsc && electron .",
     "dev": "tsc && electron . test.md",
-    "test": "tsc && npx playwright test",
+    "test": "vitest run",
     "pack": "tsc && electron-builder --dir",
     "dist": "tsc && electron-builder"
   },
@@ -61,13 +61,12 @@
     "marked": "^18.0.2"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
     "@types/diff": "^8.0.0",
     "@types/node": "^25.6.0",
     "electron": "^41.2.1",
     "electron-builder": "^26.8.1",
-    "playwright": "^1.59.1",
     "sharp": "^0.34.5",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^2.1.9"
   }
 }
