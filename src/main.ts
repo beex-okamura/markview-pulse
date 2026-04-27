@@ -67,6 +67,10 @@ function parseCells(line: string): string[] {
   return line.split("|").map((c) => c.trim()).filter(Boolean);
 }
 
+function markAllCells(line: string): Set<number> {
+  return new Set(parseCells(line).map((_, i) => i));
+}
+
 function diffTableBlock(oldBlock: string, newBlock: string): string {
   const oldLines = oldBlock.split("\n").filter(Boolean);
   const newLines = newBlock.split("\n").filter(Boolean);
@@ -74,50 +78,68 @@ function diffTableBlock(oldBlock: string, newBlock: string): string {
   const oldDataLines = oldLines.slice(2);
   const newDataLines = newLines.slice(2);
 
-  // 行単位でセルの変更を検出
-  const maxRows = Math.max(oldDataLines.length, newDataLines.length);
-  const oldChangedCells: Set<number>[] = [];
-  const newChangedCells: Set<number>[] = [];
+  // diffArraysで行単位の差分を取得
+  const changes = diffArrays(oldDataLines, newDataLines);
 
-  for (let i = 0; i < maxRows; i++) {
-    if (i >= oldDataLines.length) {
-      // 新規追加行: 全セルをマーク
-      const cells = parseCells(newDataLines[i]);
-      newChangedCells.push(new Set(cells.map((_, ci) => ci)));
-    } else if (i >= newDataLines.length) {
-      // 削除行: 全セルをマーク
-      const cells = parseCells(oldDataLines[i]);
-      oldChangedCells.push(new Set(cells.map((_, ci) => ci)));
-    } else if (oldDataLines[i] !== newDataLines[i]) {
-      // 変更行: 変更セルを検出
-      const oldCells = parseCells(oldDataLines[i]);
-      const newCells = parseCells(newDataLines[i]);
-      const maxCells = Math.max(oldCells.length, newCells.length);
-      const changed = new Set<number>();
-      for (let ci = 0; ci < maxCells; ci++) {
-        if ((oldCells[ci] || "") !== (newCells[ci] || "")) {
-          changed.add(ci);
+  const oldChangedCells: Set<number>[] = oldDataLines.map(() => new Set());
+  const newChangedCells: Set<number>[] = newDataLines.map(() => new Set());
+
+  let oldRowIdx = 0;
+  let newRowIdx = 0;
+
+  for (let ci = 0; ci < changes.length; ci++) {
+    const part = changes[ci];
+
+    if (!part.added && !part.removed) {
+      oldRowIdx += part.value.length;
+      newRowIdx += part.value.length;
+    } else if (part.removed && ci + 1 < changes.length && changes[ci + 1].added) {
+      // removed + added のペア = 変更行
+      const nextPart = changes[ci + 1];
+      const minLen = Math.min(part.value.length, nextPart.value.length);
+
+      for (let i = 0; i < minLen; i++) {
+        const oldCells = parseCells(part.value[i]);
+        const newCells = parseCells(nextPart.value[i]);
+        const maxCells = Math.max(oldCells.length, newCells.length);
+        for (let c = 0; c < maxCells; c++) {
+          if ((oldCells[c] || "") !== (newCells[c] || "")) {
+            oldChangedCells[oldRowIdx + i].add(c);
+            newChangedCells[newRowIdx + i].add(c);
+          }
         }
       }
-      oldChangedCells.push(changed);
-      newChangedCells.push(changed);
+      for (let i = minLen; i < part.value.length; i++) {
+        oldChangedCells[oldRowIdx + i] = markAllCells(part.value[i]);
+      }
+      for (let i = minLen; i < nextPart.value.length; i++) {
+        newChangedCells[newRowIdx + i] = markAllCells(nextPart.value[i]);
+      }
+
+      oldRowIdx += part.value.length;
+      newRowIdx += nextPart.value.length;
+      ci++;
+    } else if (part.removed) {
+      for (let i = 0; i < part.value.length; i++) {
+        oldChangedCells[oldRowIdx + i] = markAllCells(part.value[i]);
+      }
+      oldRowIdx += part.value.length;
     } else {
-      oldChangedCells.push(new Set());
-      newChangedCells.push(new Set());
+      for (let i = 0; i < part.value.length; i++) {
+        newChangedCells[newRowIdx + i] = markAllCells(part.value[i]);
+      }
+      newRowIdx += part.value.length;
     }
   }
 
-  // 変更がなければ通常表示
   const hasChanges = [...oldChangedCells, ...newChangedCells].some((s) => s.size > 0);
   if (!hasChanges) {
     return marked.parse(newBlock + "\n") as string;
   }
 
-  // 変更前テーブル（変更セルを赤）
   const oldHtml = marked.parse(oldBlock + "\n") as string;
   const oldMarked = applyDiffCellClass(oldHtml, oldChangedCells, "diff-cell-removed");
 
-  // 変更後テーブル（変更セルを緑）
   const newHtml = marked.parse(newBlock + "\n") as string;
   const newMarked = applyDiffCellClass(newHtml, newChangedCells, "diff-cell-added");
 
