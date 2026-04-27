@@ -259,20 +259,13 @@ th {
   opacity: 0.7;
 }
 
-/* テーブル行単位の差分 */
-tr.diff-added-row td {
-  background: var(--diff-added-bg);
-}
-
-tr.diff-removed-row td {
-  background: var(--diff-removed-bg);
-  text-decoration: line-through;
-  opacity: 0.7;
-}
-
 /* テーブルセル単位の差分 */
-td.diff-changed-cell {
+td.diff-cell-added {
   background: var(--diff-added-bg);
+}
+
+td.diff-cell-removed {
+  background: var(--diff-removed-bg);
 }
 
 /* ホバーボタン共通 */

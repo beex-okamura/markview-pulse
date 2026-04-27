@@ -63,171 +63,146 @@ function addRecentFile(filePath: string): void {
   buildMenu();
 }
 
-function isTableBlock(block: string): boolean {
-  const lines = block.split("\n").filter(Boolean);
-  return lines.length >= 2 && lines[0].includes("|") && /^\|?[\s-:|]+\|?$/.test(lines[1]);
-}
-
 function parseCells(line: string): string[] {
   return line.split("|").map((c) => c.trim()).filter(Boolean);
 }
-
-function findChangedCells(oldLine: string, newLine: string): Set<number> {
-  const oldCells = parseCells(oldLine);
-  const newCells = parseCells(newLine);
-  const changed = new Set<number>();
-  const maxLen = Math.max(oldCells.length, newCells.length);
-  for (let i = 0; i < maxLen; i++) {
-    if ((oldCells[i] || "") !== (newCells[i] || "")) {
-      changed.add(i);
-    }
-  }
-  return changed;
-}
-
-type RowInfo = {
-  line: string;
-  mark: "same" | "added" | "removed";
-  oldLine?: string; // 変更行の場合、対応する旧行
-};
 
 function diffTableBlock(oldBlock: string, newBlock: string): string {
   const oldLines = oldBlock.split("\n").filter(Boolean);
   const newLines = newBlock.split("\n").filter(Boolean);
 
-  const headerLines = newLines.slice(0, 2);
   const oldDataLines = oldLines.slice(2);
   const newDataLines = newLines.slice(2);
 
-  // diffArraysで行内容ベースの差分を取得
-  const changes = diffArrays(oldDataLines, newDataLines);
+  // 行単位でセルの変更を検出
+  const maxRows = Math.max(oldDataLines.length, newDataLines.length);
+  const oldChangedCells: Set<number>[] = [];
+  const newChangedCells: Set<number>[] = [];
 
-  // removed行とadded行のペアを検出して「変更」行を特定
-  const rows: RowInfo[] = [];
-  for (let ci = 0; ci < changes.length; ci++) {
-    const part = changes[ci];
-    if (part.removed && ci + 1 < changes.length && changes[ci + 1].added) {
-      // removed + added のペア = 変更行
-      const nextPart = changes[ci + 1];
-      const maxPair = Math.max(part.value.length, nextPart.value.length);
-      for (let i = 0; i < maxPair; i++) {
-        if (i < nextPart.value.length && i < part.value.length) {
-          // 変更行: 新行を表示し、旧行情報を保持
-          rows.push({ line: nextPart.value[i], mark: "added", oldLine: part.value[i] });
-        } else if (i < nextPart.value.length) {
-          // 追加行
-          rows.push({ line: nextPart.value[i], mark: "added" });
-        } else {
-          // 削除行
-          rows.push({ line: part.value[i], mark: "removed" });
+  for (let i = 0; i < maxRows; i++) {
+    if (i >= oldDataLines.length) {
+      // 新規追加行: 全セルをマーク
+      const cells = parseCells(newDataLines[i]);
+      newChangedCells.push(new Set(cells.map((_, ci) => ci)));
+    } else if (i >= newDataLines.length) {
+      // 削除行: 全セルをマーク
+      const cells = parseCells(oldDataLines[i]);
+      oldChangedCells.push(new Set(cells.map((_, ci) => ci)));
+    } else if (oldDataLines[i] !== newDataLines[i]) {
+      // 変更行: 変更セルを検出
+      const oldCells = parseCells(oldDataLines[i]);
+      const newCells = parseCells(newDataLines[i]);
+      const maxCells = Math.max(oldCells.length, newCells.length);
+      const changed = new Set<number>();
+      for (let ci = 0; ci < maxCells; ci++) {
+        if ((oldCells[ci] || "") !== (newCells[ci] || "")) {
+          changed.add(ci);
         }
       }
-      ci++; // addedパートをスキップ
+      oldChangedCells.push(changed);
+      newChangedCells.push(changed);
     } else {
-      for (const line of part.value) {
-        if (part.added) {
-          rows.push({ line, mark: "added" });
-        } else if (part.removed) {
-          rows.push({ line, mark: "removed" });
-        } else {
-          rows.push({ line, mark: "same" });
-        }
-      }
+      oldChangedCells.push(new Set());
+      newChangedCells.push(new Set());
     }
   }
 
-  // 統合テーブルをHTMLに変換
-  const allLines = [...headerLines, ...rows.map((r) => r.line)];
-  const combinedTable = allLines.join("\n") + "\n";
-  const fullHtml = marked.parse(combinedTable) as string;
-
-  // tr要素にクラスを付与、変更行はセル単位でマーキング
-  let rowIndex = 0;
-  let markedHtml = fullHtml.replace(/<tr>/g, () => {
-    const current = rowIndex++;
-    if (current === 0) return "<tr>"; // ヘッダー行
-    const dataRowIndex = current - 1;
-    const row = rows[dataRowIndex];
-    if (!row) return "<tr>";
-    if (row.mark === "removed") {
-      return `<tr class="diff-removed-row">`;
-    }
-    if (row.mark === "added") {
-      return `<tr class="diff-modified-row" data-row-index="${dataRowIndex}">`;
-    }
-    return "<tr>";
-  });
-
-  // 変更行のセルにクラスを付与
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    if (row.mark === "added" && row.oldLine) {
-      const changedCells = findChangedCells(row.oldLine, row.line);
-      if (changedCells.size > 0) {
-        // この行のtdにセル単位のマーキングを適用
-        let cellIndex = 0;
-        markedHtml = markedHtml.replace(
-          new RegExp(`<tr class="diff-modified-row" data-row-index="${i}">([\\s\\S]*?)</tr>`),
-          (match, inner) => {
-            const markedInner = inner.replace(/<td>/g, () => {
-              const ci = cellIndex++;
-              if (changedCells.has(ci)) {
-                return `<td class="diff-changed-cell">`;
-              }
-              return "<td>";
-            });
-            return `<tr class="diff-modified-row">${markedInner}</tr>`;
-          }
-        );
-      }
-    }
+  // 変更がなければ通常表示
+  const hasChanges = [...oldChangedCells, ...newChangedCells].some((s) => s.size > 0);
+  if (!hasChanges) {
+    return marked.parse(newBlock + "\n") as string;
   }
 
-  // 変更なしの変更行マーカーをクリーンアップ（oldLineがない追加行）
-  markedHtml = markedHtml.replace(/<tr class="diff-modified-row"[^>]*>/g, (match) => {
-    if (match.includes("data-row-index")) {
-      return `<tr class="diff-added-row">`;
-    }
-    return match;
-  });
+  // 変更前テーブル（変更セルを赤）
+  const oldHtml = marked.parse(oldBlock + "\n") as string;
+  const oldMarked = applyDiffCellClass(oldHtml, oldChangedCells, "diff-cell-removed");
 
-  return markedHtml;
+  // 変更後テーブル（変更セルを緑）
+  const newHtml = marked.parse(newBlock + "\n") as string;
+  const newMarked = applyDiffCellClass(newHtml, newChangedCells, "diff-cell-added");
+
+  return `<div class="diff-removed">${oldMarked}</div>${newMarked}`;
+}
+
+function applyDiffCellClass(tableHtml: string, changedCells: Set<number>[], cssClass: string): string {
+  let dataRowIndex = -1; // -1 = ヘッダー行
+  let cellIndex = 0;
+
+  return tableHtml.replace(/<tr>|<td>/g, (match) => {
+    if (match === "<tr>") {
+      dataRowIndex++;
+      cellIndex = 0;
+      return "<tr>";
+    }
+    // <td> — dataRowIndex 0 はヘッダー行(thなので到達しない)
+    const row = changedCells[dataRowIndex - 1];
+    const ci = cellIndex++;
+    if (row && row.has(ci)) {
+      return `<td class="${cssClass}">`;
+    }
+    return "<td>";
+  });
 }
 
 function buildDiffHtml(oldContent: string, newContent: string): string {
-  // 段落（空行区切り）ブロック単位で比較し、各ブロックを完全な状態でHTMLに変換する
   const oldBlocks = oldContent.split(/\n\n+/).map((b) => b.trim()).filter(Boolean);
   const newBlocks = newContent.split(/\n\n+/).map((b) => b.trim()).filter(Boolean);
 
+  const changes = diffArrays(oldBlocks, newBlocks);
+
   let html = "";
 
-  // 新ブロックを処理
-  for (let i = 0; i < newBlocks.length; i++) {
-    const block = newBlocks[i];
-    if (i >= oldBlocks.length) {
-      // 新規ブロック
-      const rendered = marked.parse(block + "\n") as string;
-      html += `<div class="diff-added">${rendered}</div>`;
-    } else if (oldBlocks[i] === block) {
-      // 変更なし
-      html += marked.parse(block + "\n") as string;
-    } else if (isTableBlock(block) && isTableBlock(oldBlocks[i])) {
-      // テーブルブロック: 行単位で差分表示
-      html += diffTableBlock(oldBlocks[i], block);
+  for (let ci = 0; ci < changes.length; ci++) {
+    const part = changes[ci];
+
+    if (!part.added && !part.removed) {
+      for (const block of part.value) {
+        html += marked.parse(block + "\n") as string;
+      }
+    } else if (part.removed && ci + 1 < changes.length && changes[ci + 1].added) {
+      const nextPart = changes[ci + 1];
+      const oldParts = part.value;
+      const newParts = nextPart.value;
+      const maxLen = Math.max(oldParts.length, newParts.length);
+
+      for (let i = 0; i < maxLen; i++) {
+        if (i < oldParts.length && i < newParts.length) {
+          if (isTableBlock(oldParts[i]) && isTableBlock(newParts[i])) {
+            html += diffTableBlock(oldParts[i], newParts[i]);
+          } else {
+            const oldRendered = marked.parse(oldParts[i] + "\n") as string;
+            html += `<div class="diff-removed">${oldRendered}</div>`;
+            const newRendered = marked.parse(newParts[i] + "\n") as string;
+            html += `<div class="diff-added">${newRendered}</div>`;
+          }
+        } else if (i < newParts.length) {
+          const rendered = marked.parse(newParts[i] + "\n") as string;
+          html += `<div class="diff-added">${rendered}</div>`;
+        } else {
+          const rendered = marked.parse(oldParts[i] + "\n") as string;
+          html += `<div class="diff-removed">${rendered}</div>`;
+        }
+      }
+      ci++;
+    } else if (part.added) {
+      for (const block of part.value) {
+        const rendered = marked.parse(block + "\n") as string;
+        html += `<div class="diff-added">${rendered}</div>`;
+      }
     } else {
-      // 非テーブルブロック: ブロック全体をマーキング
-      const rendered = marked.parse(block + "\n") as string;
-      html += `<div class="diff-added">${rendered}</div>`;
+      for (const block of part.value) {
+        const rendered = marked.parse(block + "\n") as string;
+        html += `<div class="diff-removed">${rendered}</div>`;
+      }
     }
   }
 
-  // 削除されたブロック
-  for (let i = newBlocks.length; i < oldBlocks.length; i++) {
-    const rendered = marked.parse(oldBlocks[i] + "\n") as string;
-    html += `<div class="diff-removed">${rendered}</div>`;
-  }
-
   return html;
+}
+
+function isTableBlock(block: string): boolean {
+  const lines = block.split("\n").filter(Boolean);
+  return lines.length >= 2 && lines[0].includes("|") && /^\|?[\s-:|]+\|?$/.test(lines[1]);
 }
 
 function buildMenu(): void {
