@@ -315,6 +315,112 @@ td.diff-cell-removed {
   margin: 40px auto;
 }
 
+.welcome-mode-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.welcome-mode-tab {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  opacity: 0.55;
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: opacity 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.welcome-mode-tab:hover {
+  opacity: 0.85;
+}
+
+.welcome-mode-tab-active {
+  opacity: 1;
+  color: var(--link);
+  border-bottom-color: var(--link);
+}
+
+.welcome-mode-panel {
+  display: none;
+}
+
+.welcome-mode-panel-active {
+  display: block;
+}
+
+.welcome-diff-zones {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.welcome-drop-zone-half {
+  flex: 1;
+  padding: 32px 16px;
+  gap: 8px;
+}
+
+.welcome-drop-zone-half .welcome-drop-text {
+  font-size: 13px;
+  text-align: center;
+}
+
+.welcome-diff-vs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  opacity: 0.4;
+}
+
+.welcome-diff-compare-btn {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--link);
+  border-radius: 6px;
+  background: var(--link);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.welcome-diff-compare-btn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.welcome-diff-compare-btn:disabled {
+  border-color: var(--border);
+  background: var(--bg);
+  color: var(--text);
+  opacity: 0.4;
+  font-weight: normal;
+  cursor: not-allowed;
+}
+
+.welcome-drop-zone-half.welcome-drop-zone-filled {
+  opacity: 1;
+  border-style: solid;
+  border-color: var(--link);
+  background: rgba(3, 102, 214, 0.06);
+}
+
+.welcome-drop-zone-half.welcome-drop-zone-filled .welcome-drop-text {
+  color: var(--link);
+  font-weight: 600;
+  word-break: break-all;
+}
+
 .welcome-drop-zone {
   display: flex;
   flex-direction: column;

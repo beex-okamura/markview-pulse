@@ -56,7 +56,8 @@ function renderTabs(tabList: TabInfo[], activeTabId: string | null): void {
 
   // ステータスバーにアクティブタブのパスを表示
   const activeTab = tabList.find((t) => t.id === activeTabId);
-  statusBar.textContent = activeTab && !activeTab.path.startsWith("__welcome_") ? activeTab.path : "";
+  const isVirtualTab = activeTab && (activeTab.path.startsWith("__welcome_") || activeTab.path.startsWith("__diff_"));
+  statusBar.textContent = activeTab && !isVirtualTab ? activeTab.path : "";
 }
 
 function render(): void {
@@ -180,7 +181,25 @@ async function showWelcome(): Promise<void> {
   const wrapper = document.createElement("div");
   wrapper.className = "welcome-wrapper";
 
-  // ドロップゾーン
+  // モード切り替えタブ
+  const modeTabs = document.createElement("div");
+  modeTabs.className = "welcome-mode-tabs";
+  modeTabs.innerHTML = `
+    <button class="welcome-mode-tab welcome-mode-tab-active" data-mode="open">ファイルを開く</button>
+    <button class="welcome-mode-tab" data-mode="diff">差分を比較</button>
+  `;
+  wrapper.appendChild(modeTabs);
+
+  // モード別パネルのコンテナ
+  const panels = document.createElement("div");
+  panels.className = "welcome-mode-panels";
+  wrapper.appendChild(panels);
+
+  // 「ファイルを開く」モード（既存のドロップゾーン）
+  const openPanel = document.createElement("div");
+  openPanel.className = "welcome-mode-panel welcome-mode-panel-active";
+  openPanel.dataset.mode = "open";
+
   const dropZone = document.createElement("div");
   dropZone.className = "welcome-drop-zone";
   dropZone.innerHTML = `
@@ -222,7 +241,164 @@ async function showWelcome(): Promise<void> {
     }
   });
 
-  wrapper.appendChild(dropZone);
+  openPanel.appendChild(dropZone);
+  panels.appendChild(openPanel);
+
+  // 「差分を比較」モード
+  const diffPanel = document.createElement("div");
+  diffPanel.className = "welcome-mode-panel";
+  diffPanel.dataset.mode = "diff";
+  diffPanel.innerHTML = `
+    <div class="welcome-diff-zones">
+      <div class="welcome-drop-zone welcome-drop-zone-half" data-slot="before">
+        <svg width="40" height="40" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="8" y="6" width="32" height="36" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>
+          <line x1="16" y1="18" x2="32" y2="18" stroke="currentColor" stroke-width="2"/>
+          <line x1="16" y1="24" x2="32" y2="24" stroke="currentColor" stroke-width="2"/>
+          <line x1="16" y1="30" x2="26" y2="30" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <p class="welcome-drop-text">変更前のファイル</p>
+        <button class="welcome-browse-btn">ファイルを選択</button>
+      </div>
+      <div class="welcome-diff-vs">vs</div>
+      <div class="welcome-drop-zone welcome-drop-zone-half" data-slot="after">
+        <svg width="40" height="40" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="8" y="6" width="32" height="36" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>
+          <line x1="16" y1="18" x2="32" y2="18" stroke="currentColor" stroke-width="2"/>
+          <line x1="16" y1="24" x2="32" y2="24" stroke="currentColor" stroke-width="2"/>
+          <line x1="16" y1="30" x2="26" y2="30" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <p class="welcome-drop-text">変更後のファイル</p>
+        <button class="welcome-browse-btn">ファイルを選択</button>
+      </div>
+    </div>
+    <button class="welcome-diff-compare-btn" disabled>差分を表示</button>
+  `;
+  panels.appendChild(diffPanel);
+
+  type SlotKey = "before" | "after";
+  const diffSlots: Record<SlotKey, { zone: HTMLDivElement; text: HTMLParagraphElement; browseBtn: HTMLButtonElement; placeholder: string }> = {
+    before: {
+      zone: diffPanel.querySelector<HTMLDivElement>('[data-slot="before"]')!,
+      text: diffPanel.querySelector<HTMLParagraphElement>('[data-slot="before"] .welcome-drop-text')!,
+      browseBtn: diffPanel.querySelector<HTMLButtonElement>('[data-slot="before"] .welcome-browse-btn')!,
+      placeholder: "変更前のファイル",
+    },
+    after: {
+      zone: diffPanel.querySelector<HTMLDivElement>('[data-slot="after"]')!,
+      text: diffPanel.querySelector<HTMLParagraphElement>('[data-slot="after"] .welcome-drop-text')!,
+      browseBtn: diffPanel.querySelector<HTMLButtonElement>('[data-slot="after"] .welcome-browse-btn')!,
+      placeholder: "変更後のファイル",
+    },
+  };
+  const compareBtn = diffPanel.querySelector<HTMLButtonElement>(".welcome-diff-compare-btn")!;
+  const diffPaths: Record<SlotKey, string | null> = { before: null, after: null };
+
+  function renderSlot(key: SlotKey) {
+    const slot = diffSlots[key];
+    const filePath = diffPaths[key];
+    if (filePath) {
+      const fileName = filePath.split("/").pop() || filePath;
+      slot.text.textContent = fileName;
+      slot.zone.classList.add("welcome-drop-zone-filled");
+    } else {
+      slot.text.textContent = slot.placeholder;
+      slot.zone.classList.remove("welcome-drop-zone-filled");
+    }
+  }
+
+  function updateCompareBtn() {
+    compareBtn.disabled = !(diffPaths.before && diffPaths.after);
+  }
+
+  function setDiffSlot(key: SlotKey, filePath: string) {
+    diffPaths[key] = filePath;
+    renderSlot(key);
+    updateCompareBtn();
+  }
+
+  function resetDiffSlots() {
+    diffPaths.before = null;
+    diffPaths.after = null;
+    renderSlot("before");
+    renderSlot("after");
+    updateCompareBtn();
+  }
+
+  // ロジックの source of truth: src/diff-slots.ts (renderer はバンドル未対応のため import 不可、同期はテスト test/diff-slots.test.ts で担保)
+  function fillNextDiffSlot(filePath: string) {
+    if (!diffPaths.before) {
+      setDiffSlot("before", filePath);
+    } else if (!diffPaths.after) {
+      setDiffSlot("after", filePath);
+    } else {
+      diffPaths.before = diffPaths.after;
+      diffPaths.after = filePath;
+      renderSlot("before");
+      renderSlot("after");
+    }
+  }
+
+  // 各スロットのドラッグ&ドロップとファイル選択ボタン
+  (Object.keys(diffSlots) as SlotKey[]).forEach((key) => {
+    const slot = diffSlots[key];
+    slot.zone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      slot.zone.classList.add("welcome-drop-hover");
+    });
+    slot.zone.addEventListener("dragleave", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      slot.zone.classList.remove("welcome-drop-hover");
+    });
+    slot.zone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      slot.zone.classList.remove("welcome-drop-hover");
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) {
+        const file = files[0];
+        if (file.name.endsWith(".md")) {
+          const filePath = (window as any).api.getPathForFile(file);
+          setDiffSlot(key, filePath);
+        }
+      }
+    });
+    slot.browseBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const filePath: string | null = await (window as any).api.pickMarkdownFile();
+      if (filePath) {
+        setDiffSlot(key, filePath);
+      }
+    });
+  });
+
+  compareBtn.addEventListener("click", () => {
+    if (diffPaths.before && diffPaths.after) {
+      (window as any).api.openDiffTab(diffPaths.before, diffPaths.after);
+    }
+  });
+
+  // 現在のモード（最近ファイルクリック時の分岐に使用）
+  let currentMode: "open" | "diff" = "open";
+
+  // タブ切り替え
+  modeTabs.querySelectorAll<HTMLButtonElement>(".welcome-mode-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const mode = tab.dataset.mode as "open" | "diff";
+      currentMode = mode;
+      modeTabs.querySelectorAll(".welcome-mode-tab").forEach((t) => {
+        t.classList.toggle("welcome-mode-tab-active", t === tab);
+      });
+      panels.querySelectorAll<HTMLDivElement>(".welcome-mode-panel").forEach((p) => {
+        p.classList.toggle("welcome-mode-panel-active", p.dataset.mode === mode);
+      });
+      if (mode === "diff") {
+        resetDiffSlots();
+      }
+    });
+  });
 
   // 最近開いたファイルリスト
   if (recentFiles.length > 0) {
@@ -242,7 +418,11 @@ async function showWelcome(): Promise<void> {
       const dirPath = filePath.substring(0, filePath.length - fileName.length);
       li.innerHTML = `<span class="welcome-recent-name">${fileName}</span><span class="welcome-recent-path">${dirPath}</span>`;
       li.addEventListener("click", () => {
-        (window as any).api.openFile(filePath);
+        if (currentMode === "diff") {
+          fillNextDiffSlot(filePath);
+        } else {
+          (window as any).api.openFile(filePath);
+        }
       });
       list.appendChild(li);
     }
