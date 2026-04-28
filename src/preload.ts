@@ -37,4 +37,10 @@ contextBridge.exposeInMainWorld("api", {
   getPathForFile: (file: File) => {
     return webUtils.getPathForFile(file);
   },
+  pickMarkdownFile: (): Promise<string | null> => {
+    return ipcRenderer.invoke("pick-markdown-file");
+  },
+  openDiffTab: (beforePath: string, afterPath: string) => {
+    ipcRenderer.send("open-diff-tab", beforePath, afterPath);
+  },
 });

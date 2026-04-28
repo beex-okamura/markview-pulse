@@ -36,11 +36,13 @@ type Tab = {
   id: string;
   filePath: string;
   previousContent: string;
+  diff?: { beforePath: string; afterPath: string };
 };
 
 let tabs: Tab[] = [];
 let activeTabId: string | null = null;
 let nextTabId = 1;
+let nextDiffNum = 1;
 
 const MAX_RECENT_FILES = 10;
 const recentFilesPath = path.join(app.getPath("userData"), "recent-files.json");
@@ -202,11 +204,15 @@ function sendTabsToRenderer(): void {
   if (!mainWindow) return;
   const tabInfos = tabs.map((t) => {
     const welcomeMatch = t.filePath.match(/^__welcome_(\d+)__$/);
-    return {
-      id: t.id,
-      name: welcomeMatch ? `新規タブ${welcomeMatch[1]}` : path.basename(t.filePath),
-      path: t.filePath,
-    };
+    if (welcomeMatch) {
+      return { id: t.id, name: `新規タブ${welcomeMatch[1]}`, path: t.filePath };
+    }
+    if (t.diff) {
+      const before = path.basename(t.diff.beforePath);
+      const after = path.basename(t.diff.afterPath);
+      return { id: t.id, name: `差分: ${before} ↔ ${after}`, path: t.filePath };
+    }
+    return { id: t.id, name: path.basename(t.filePath), path: t.filePath };
   });
   mainWindow.webContents.send("update-tabs", tabInfos, activeTabId);
 }
@@ -254,6 +260,21 @@ function activateTab(tab: Tab): void {
     mainWindow.webContents.send("show-welcome");
     const num = tab.filePath.match(/^__welcome_(\d+)__$/)?.[1] || "";
     mainWindow.setTitle(`新規タブ${num} - Markview Pulse`);
+    sendTabsToRenderer();
+    return;
+  }
+
+  if (tab.diff) {
+    if (watchTimer) {
+      clearInterval(watchTimer);
+      watchTimer = null;
+    }
+    const before = fs.readFileSync(tab.diff.beforePath, "utf-8");
+    const after = fs.readFileSync(tab.diff.afterPath, "utf-8");
+    const html = marked.parse(after) as string;
+    const diffHtml = buildDiffHtml(before, after);
+    mainWindow.webContents.send("load-html", html, diffHtml);
+    mainWindow.setTitle(`差分: ${path.basename(tab.diff.beforePath)} ↔ ${path.basename(tab.diff.afterPath)}`);
     sendTabsToRenderer();
     return;
   }
@@ -407,6 +428,49 @@ ipcMain.on("open-file-dialog", async () => {
 
 ipcMain.handle("get-recent-files", () => {
   return getRecentFiles();
+});
+
+ipcMain.handle("pick-markdown-file", async (): Promise<string | null> => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    filters: [{ name: "Markdown", extensions: ["md"] }],
+    properties: ["openFile"],
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return result.filePaths[0];
+});
+
+ipcMain.on("open-diff-tab", (_event, beforePath: string, afterPath: string) => {
+  if (!mainWindow) return;
+  if (!fs.existsSync(beforePath) || !fs.existsSync(afterPath)) return;
+
+  addRecentFile(beforePath);
+  addRecentFile(afterPath);
+
+  const num = nextDiffNum++;
+  const diffFilePath = `__diff_${num}__`;
+
+  // アクティブタブがウェルカムタブなら置き換える
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  const welcomeTab = activeTab?.filePath.startsWith("__welcome_") ? activeTab : undefined;
+
+  if (welcomeTab) {
+    welcomeTab.filePath = diffFilePath;
+    welcomeTab.previousContent = "";
+    welcomeTab.diff = { beforePath, afterPath };
+    activateTab(welcomeTab);
+    return;
+  }
+
+  // ウェルカムタブが見つからない場合は新規タブを追加
+  const tab: Tab = {
+    id: String(nextTabId++),
+    filePath: diffFilePath,
+    previousContent: "",
+    diff: { beforePath, afterPath },
+  };
+  tabs.push(tab);
+  activateTab(tab);
 });
 
 let nextWelcomeNum = 1;
