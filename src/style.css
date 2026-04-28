@@ -294,7 +294,7 @@ td.diff-cell-removed {
 }
 
 #width-toggle {
-  bottom: 74px;
+  bottom: 98px;
   right: 20px;
   font-size: 11px;
   font-weight: 600;
@@ -305,6 +305,6 @@ td.diff-cell-removed {
 }
 
 #diff-toggle {
-  bottom: 20px;
+  bottom: 44px;
   right: 20px;
 }
