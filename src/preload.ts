@@ -11,6 +11,11 @@ contextBridge.exposeInMainWorld("api", {
       callback(tabs, activeTabId);
     });
   },
+  onShowWelcome: (callback: () => void) => {
+    ipcRenderer.on("show-welcome", () => {
+      callback();
+    });
+  },
   openFile: (filePath: string) => {
     ipcRenderer.send("open-file", filePath);
   },
@@ -22,6 +27,12 @@ contextBridge.exposeInMainWorld("api", {
   },
   openFileDialog: () => {
     ipcRenderer.send("open-file-dialog");
+  },
+  getRecentFiles: (): Promise<string[]> => {
+    return ipcRenderer.invoke("get-recent-files");
+  },
+  openWelcomeTab: () => {
+    ipcRenderer.send("open-welcome-tab");
   },
   getPathForFile: (file: File) => {
     return webUtils.getPathForFile(file);

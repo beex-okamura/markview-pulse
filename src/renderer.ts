@@ -48,21 +48,22 @@ function renderTabs(tabList: TabInfo[], activeTabId: string | null): void {
   const addBtn = document.createElement("div");
   addBtn.className = "tab-add";
   addBtn.textContent = "+";
-  addBtn.title = "ファイルを開く";
+  addBtn.title = "新しいタブを開く";
   addBtn.addEventListener("click", () => {
-    (window as any).api.openFileDialog();
+    (window as any).api.openWelcomeTab();
   });
   tabBar.appendChild(addBtn);
 
   // ステータスバーにアクティブタブのパスを表示
   const activeTab = tabList.find((t) => t.id === activeTabId);
-  statusBar.textContent = activeTab ? activeTab.path : "";
+  statusBar.textContent = activeTab && !activeTab.path.startsWith("__welcome_") ? activeTab.path : "";
 }
 
 function render(): void {
   const container = document.getElementById("content");
   if (!container) return;
 
+  showFloatButtons();
   const scrollTop = document.documentElement.scrollTop;
   const html = showDiff && currentDiffHtml ? currentDiffHtml : currentHtml;
   container.innerHTML = html;
@@ -101,13 +102,16 @@ const ICON_NORMAL = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"
 
 function updateToggleButton(): void {
   const btn = document.getElementById("diff-toggle");
+  const wbtn = document.getElementById("width-toggle");
   if (!btn) return;
   if (!currentDiffHtml) {
     btn.style.display = "none";
+    if (wbtn) wbtn.style.bottom = "44px";
   } else {
     btn.style.display = "";
     btn.innerHTML = showDiff ? ICON_NORMAL : ICON_DIFF;
     btn.title = showDiff ? "通常表示に戻す" : "差分を表示";
+    if (wbtn) wbtn.style.bottom = "98px";
   }
 }
 
@@ -149,6 +153,108 @@ document.body.appendChild(btn);
 
 (window as any).api.onUpdateTabs((tabList: TabInfo[], activeTabId: string | null) => {
   renderTabs(tabList, activeTabId);
+});
+
+// ウェルカム画面表示
+function hideFloatButtons(): void {
+  const wbtn = document.getElementById("width-toggle");
+  const dbtn = document.getElementById("diff-toggle");
+  if (wbtn) wbtn.style.display = "none";
+  if (dbtn) dbtn.style.display = "none";
+}
+
+function showFloatButtons(): void {
+  const wbtn = document.getElementById("width-toggle");
+  if (wbtn) wbtn.style.display = "";
+}
+
+async function showWelcome(): Promise<void> {
+  const container = document.getElementById("content");
+  if (!container) return;
+
+  hideFloatButtons();
+
+  const recentFiles: string[] = await (window as any).api.getRecentFiles();
+
+  container.innerHTML = "";
+  const wrapper = document.createElement("div");
+  wrapper.className = "welcome-wrapper";
+
+  // ドロップゾーン
+  const dropZone = document.createElement("div");
+  dropZone.className = "welcome-drop-zone";
+  dropZone.innerHTML = `
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="8" y="6" width="32" height="36" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>
+      <line x1="16" y1="18" x2="32" y2="18" stroke="currentColor" stroke-width="2"/>
+      <line x1="16" y1="24" x2="32" y2="24" stroke="currentColor" stroke-width="2"/>
+      <line x1="16" y1="30" x2="26" y2="30" stroke="currentColor" stroke-width="2"/>
+    </svg>
+    <p class="welcome-drop-text">Markdownファイルをここにドラッグ&ドロップ</p>
+    <button class="welcome-browse-btn">ファイルを選択</button>
+  `;
+
+  dropZone.querySelector(".welcome-browse-btn")!.addEventListener("click", () => {
+    (window as any).api.openFileDialog();
+  });
+
+  dropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.add("welcome-drop-hover");
+  });
+  dropZone.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.remove("welcome-drop-hover");
+  });
+  dropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.remove("welcome-drop-hover");
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.name.endsWith(".md")) {
+        const filePath = (window as any).api.getPathForFile(file);
+        (window as any).api.openFile(filePath);
+      }
+    }
+  });
+
+  wrapper.appendChild(dropZone);
+
+  // 最近開いたファイルリスト
+  if (recentFiles.length > 0) {
+    const recentSection = document.createElement("div");
+    recentSection.className = "welcome-recent";
+    const heading = document.createElement("h3");
+    heading.className = "welcome-recent-heading";
+    heading.textContent = "最近開いたファイル";
+    recentSection.appendChild(heading);
+
+    const list = document.createElement("ul");
+    list.className = "welcome-recent-list";
+    for (const filePath of recentFiles) {
+      const li = document.createElement("li");
+      li.className = "welcome-recent-item";
+      const fileName = filePath.split("/").pop() || filePath;
+      const dirPath = filePath.substring(0, filePath.length - fileName.length);
+      li.innerHTML = `<span class="welcome-recent-name">${fileName}</span><span class="welcome-recent-path">${dirPath}</span>`;
+      li.addEventListener("click", () => {
+        (window as any).api.openFile(filePath);
+      });
+      list.appendChild(li);
+    }
+    recentSection.appendChild(list);
+    wrapper.appendChild(recentSection);
+  }
+
+  container.appendChild(wrapper);
+}
+
+(window as any).api.onShowWelcome(() => {
+  showWelcome();
 });
 
 // ドラッグ&ドロップ
