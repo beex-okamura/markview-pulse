@@ -200,7 +200,14 @@ function getActiveTab(): Tab | undefined {
 
 function sendTabsToRenderer(): void {
   if (!mainWindow) return;
-  const tabInfos = tabs.map((t) => ({ id: t.id, name: path.basename(t.filePath), path: t.filePath }));
+  const tabInfos = tabs.map((t) => {
+    const welcomeMatch = t.filePath.match(/^__welcome_(\d+)__$/);
+    return {
+      id: t.id,
+      name: welcomeMatch ? `新規タブ${welcomeMatch[1]}` : path.basename(t.filePath),
+      path: t.filePath,
+    };
+  });
   mainWindow.webContents.send("update-tabs", tabInfos, activeTabId);
 }
 
@@ -239,6 +246,18 @@ function activateTab(tab: Tab): void {
   if (!mainWindow) return;
   activeTabId = tab.id;
 
+  if (tab.filePath.startsWith("__welcome_")) {
+    if (watchTimer) {
+      clearInterval(watchTimer);
+      watchTimer = null;
+    }
+    mainWindow.webContents.send("show-welcome");
+    const num = tab.filePath.match(/^__welcome_(\d+)__$/)?.[1] || "";
+    mainWindow.setTitle(`新規タブ${num} - Markview Pulse`);
+    sendTabsToRenderer();
+    return;
+  }
+
   // ファイルを再読み込みして表示
   tab.previousContent = "";
   const content = fs.readFileSync(tab.filePath, "utf-8");
@@ -256,6 +275,17 @@ function loadMarkdown(filePath: string): void {
   const existing = tabs.find((t) => t.filePath === filePath);
   if (existing) {
     activateTab(existing);
+    return;
+  }
+
+  // アクティブタブがウェルカムタブなら置き換える
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  const welcomeTab = activeTab?.filePath.startsWith("__welcome_") ? activeTab : undefined;
+  if (welcomeTab) {
+    welcomeTab.filePath = filePath;
+    welcomeTab.previousContent = "";
+    activateTab(welcomeTab);
+    addRecentFile(filePath);
     return;
   }
 
@@ -294,7 +324,7 @@ function closeTab(tabId: string): void {
       watchTimer = null;
     }
     if (mainWindow) {
-      mainWindow.webContents.send("load-html", "<p>Markdownファイルを開いてください。</p>", "");
+      mainWindow.webContents.send("show-welcome");
       mainWindow.setTitle("Markview Pulse");
       sendTabsToRenderer();
     }
@@ -343,6 +373,8 @@ function createWindow(): void {
     if (filePath) {
       loadMarkdown(filePath);
       pendingFilePath = null;
+    } else {
+      mainWindow!.webContents.send("show-welcome");
     }
   });
 }
@@ -371,6 +403,27 @@ ipcMain.on("open-file-dialog", async () => {
   if (!result.canceled && result.filePaths.length > 0) {
     loadMarkdown(result.filePaths[0]);
   }
+});
+
+ipcMain.handle("get-recent-files", () => {
+  return getRecentFiles();
+});
+
+let nextWelcomeNum = 1;
+
+ipcMain.on("open-welcome-tab", () => {
+  if (!mainWindow) return;
+  const num = nextWelcomeNum++;
+  const tab: Tab = {
+    id: String(nextTabId++),
+    filePath: `__welcome_${num}__`,
+    previousContent: "",
+  };
+  tabs.push(tab);
+  activeTabId = tab.id;
+  sendTabsToRenderer();
+  mainWindow.webContents.send("show-welcome");
+  mainWindow.setTitle(`新規タブ${num} - Markview Pulse`);
 });
 
 app.whenReady().then(() => {
