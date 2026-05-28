@@ -101,18 +101,46 @@ const ICON_NORMAL = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"
   <line x1="6" y1="13" x2="11" y2="13" stroke="currentColor" stroke-width="1.5"/>
 </svg>`;
 
+const ICON_CLIPBOARD = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="5" y="4" width="10" height="14" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+  <rect x="7.5" y="2.5" width="5" height="3" rx="1" stroke="currentColor" stroke-width="1.5" fill="var(--bg)"/>
+  <line x1="8" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="8" y1="12" x2="12" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+</svg>`;
+
+const toastEl = document.createElement("div");
+toastEl.id = "toast";
+document.body.appendChild(toastEl);
+let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+function showToast(message: string, kind: "info" | "error" = "info"): void {
+  toastEl.textContent = message;
+  toastEl.classList.toggle("toast-error", kind === "error");
+  toastEl.classList.add("toast-visible");
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toastEl.classList.remove("toast-visible");
+  }, 1800);
+}
+
 function updateToggleButton(): void {
   const btn = document.getElementById("diff-toggle");
   const wbtn = document.getElementById("width-toggle");
+  const sbtn = document.getElementById("screenshot-btn");
   if (!btn) return;
   if (!currentDiffHtml) {
     btn.style.display = "none";
+    if (sbtn) sbtn.style.display = "none";
     if (wbtn) wbtn.style.bottom = "44px";
   } else {
     btn.style.display = "";
     btn.innerHTML = showDiff ? ICON_NORMAL : ICON_DIFF;
     btn.title = showDiff ? "通常表示に戻す" : "差分を表示";
-    if (wbtn) wbtn.style.bottom = "98px";
+    if (sbtn) {
+      sbtn.style.display = "";
+      sbtn.style.bottom = "98px";
+    }
+    if (wbtn) wbtn.style.bottom = "152px";
   }
 }
 
@@ -142,6 +170,66 @@ btn.addEventListener("click", () => {
   render();
 });
 document.body.appendChild(btn);
+
+// 画像コピーボタンの作成（差分表示時のみ表示）
+const screenshotBtn = document.createElement("button");
+screenshotBtn.id = "screenshot-btn";
+screenshotBtn.className = "hover-btn";
+screenshotBtn.style.display = "none";
+screenshotBtn.innerHTML = ICON_CLIPBOARD;
+screenshotBtn.title = "画像としてクリップボードにコピー";
+screenshotBtn.addEventListener("click", () => {
+  copyContentAsImage();
+});
+document.body.appendChild(screenshotBtn);
+
+async function copyContentAsImage(): Promise<void> {
+  const content = document.getElementById("content");
+  if (!content) return;
+  if (screenshotBtn.dataset.busy === "1") return;
+  screenshotBtn.dataset.busy = "1";
+
+  const prevWidthIndex = widthIndex;
+  const widthChanged = widthIndex !== 1;
+  if (widthChanged) {
+    widthIndex = 1;
+    document.body.className = WIDTH_MODES[widthIndex];
+  }
+
+  const prevPadding = content.style.padding;
+  content.style.padding = "32px 24px";
+
+  try {
+    const h2c = (window as any).html2canvas as (
+      el: HTMLElement,
+      opts?: Record<string, unknown>
+    ) => Promise<HTMLCanvasElement>;
+    const canvas = await h2c(content, {
+      backgroundColor: "#ffffff",
+      scale: window.devicePixelRatio || 1,
+      useCORS: true,
+      windowWidth: content.scrollWidth,
+      windowHeight: content.scrollHeight,
+    });
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b), "image/png")
+    );
+    if (!blob) throw new Error("toBlob failed");
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+
+    showToast("画像をクリップボードにコピーしました");
+  } catch (e) {
+    console.error("画像コピーに失敗", e);
+    showToast("画像のコピーに失敗しました", "error");
+  } finally {
+    content.style.padding = prevPadding;
+    if (widthChanged) {
+      widthIndex = prevWidthIndex;
+      document.body.className = WIDTH_MODES[widthIndex];
+    }
+    screenshotBtn.dataset.busy = "";
+  }
+}
 
 // @ts-ignore: Window.api is defined by preload
 (window as any).api.onLoadHtml((html: string, diffHtml: string) => {
