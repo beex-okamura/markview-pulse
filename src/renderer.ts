@@ -107,9 +107,21 @@ const ICON_CLIPBOARD = `<svg width="20" height="20" viewBox="0 0 20 20" fill="no
   <line x1="8" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
   <line x1="8" y1="12" x2="12" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
 </svg>`;
-const ICON_CHECK = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M4 10.5l4 4 8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>`;
+
+const toastEl = document.createElement("div");
+toastEl.id = "toast";
+document.body.appendChild(toastEl);
+let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+function showToast(message: string, kind: "info" | "error" = "info"): void {
+  toastEl.textContent = message;
+  toastEl.classList.toggle("toast-error", kind === "error");
+  toastEl.classList.add("toast-visible");
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toastEl.classList.remove("toast-visible");
+  }, 1800);
+}
 
 function updateToggleButton(): void {
   const btn = document.getElementById("diff-toggle");
@@ -184,6 +196,9 @@ async function copyContentAsImage(): Promise<void> {
     document.body.className = WIDTH_MODES[widthIndex];
   }
 
+  const prevPadding = content.style.padding;
+  content.style.padding = "32px 24px";
+
   try {
     const h2c = (window as any).html2canvas as (
       el: HTMLElement,
@@ -202,16 +217,12 @@ async function copyContentAsImage(): Promise<void> {
     if (!blob) throw new Error("toBlob failed");
     await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
 
-    screenshotBtn.innerHTML = ICON_CHECK;
-    screenshotBtn.title = "コピーしました";
-    setTimeout(() => {
-      screenshotBtn.innerHTML = ICON_CLIPBOARD;
-      screenshotBtn.title = "画像としてクリップボードにコピー";
-    }, 1500);
+    showToast("画像をクリップボードにコピーしました");
   } catch (e) {
     console.error("画像コピーに失敗", e);
-    screenshotBtn.title = "コピーに失敗しました";
+    showToast("画像のコピーに失敗しました", "error");
   } finally {
+    content.style.padding = prevPadding;
     if (widthChanged) {
       widthIndex = prevWidthIndex;
       document.body.className = WIDTH_MODES[widthIndex];
