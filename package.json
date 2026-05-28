@@ -53,11 +53,13 @@
     "files": [
       "dist/**/*",
       "src/index.html",
-      "src/style.css"
+      "src/style.css",
+      "node_modules/html2canvas/dist/html2canvas.min.js"
     ]
   },
   "dependencies": {
     "diff": "^9.0.0",
+    "html2canvas": "^1.4.1",
     "marked": "^18.0.2"
   },
   "devDependencies": {

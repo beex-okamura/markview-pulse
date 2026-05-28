@@ -309,6 +309,11 @@ td.diff-cell-removed {
   right: 20px;
 }
 
+#screenshot-btn {
+  bottom: 98px;
+  right: 20px;
+}
+
 /* ウェルカム画面 */
 .welcome-wrapper {
   max-width: 560px;
